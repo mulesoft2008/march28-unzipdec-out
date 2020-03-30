@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:encryption="http://www.mulesoft.org/schema/mule/encryption" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/encryption http://www.mulesoft.org/schema/mule/encryption/current/mule-encryption.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+
+<file:connector name="sfg_unzip_input_file" outputPattern="#[message.inboundProperties.originalFilename].#[message.id]" autoDelete="true" streaming="true" validateConnections="true" fileAge="5000" doc:name="Input File"/>
+    <file:connector name="sfg_unzip_output_file" streaming="true" validateConnections="true" fileAge="5000" doc:name="Output File"/>
+
+    <vm:connector name="sfg.unzip.step2.queue" doc:name="Step2 VM" queueTimeout="100000" validateConnections="true">
+        <vm:queue-profile>
+        </vm:queue-profile>
+    </vm:connector>
+    <vm:connector name="sfg.unzip.step3.queue" doc:name="Step3 VM" validateConnections="true"/>
+  
+    <vm:connector name="sfg.common.status.queue" validateConnections="true" doc:name="VM"/>
+    <vm:connector name="sfg.common.transfer.queue" validateConnections="true" doc:name="VM"/>
+    <file:connector name="File" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+	<file:connector name="File22" outputPattern="#[message.inboundProperties.originalFilename].#[message.id]" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <encryption:config name="PGP_ENCR_DCR" defaultEncrypter="PGP_ENCRYPTER" doc:name="Encryption">
+        <encryption:pgp-encrypter-config publicKeyRingFileName="C:\Users\MuleSoft\AnypointStudio\AssignmentWs\Ttest_unzipMarch29\src\main\resources\muleuser-publickey.gpg" secretKeyRingFileName="C:\Users\MuleSoft\AnypointStudio\AssignmentWs\Ttest_unzipMarch29\src\main\resources\muleuser-privatekey.gpg" secretPassphrase="muleuser" principal="muleuser &lt;muleuser@gmail.com&gt;"/>
+    </encryption:config>
+    <vm:connector name="sfg.decrypt.step.queue" validateConnections="true" doc:name="VM"/>
+    <file:connector name="File-backup" autoDelete="false" streaming="true" validateConnections="true" doc:name="File"/>
+    
+   
+
+    <!-- Wait for the file, take a backup, send the message details to the queue and update the status -->
+    <flow name="sfg_pgp_backup_step_flow">
+		<file:inbound-endpoint path="${sfg_unzip_step1_inbox_live}"   connector-ref="File22" responseTimeout="10000" doc:name="File" moveToDirectory="${sfg_unzip_step1_inbox_backup}" moveToPattern="#[message.inboundProperties.originalFilename].#[java.util.UUID.randomUUID()]" fileAge="5000" pollingFrequency="10000"/>
+        <set-variable variableName="UUID" value="#[java.util.UUID.randomUUID()]" doc:name="UUID"/>
+        <set-variable variableName="originalFilename" value="#[message.inboundProperties.originalFilename]" doc:name="Store Filename"/>
+        <set-variable variableName="id" value="#[message.id]" doc:name="Store ID"/>
+        <set-variable variableName="stagingName" value="#[message.inboundProperties.originalFilename].#[message.id]" doc:name="Store Staging name"/>
+        <set-property propertyName="stagingName" value="#[flowVars.originalFilename].#[flowVars.UUID]" doc:name="stagingName"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.decrypt.step.queue" connector-ref="sfg.decrypt.step.queue" doc:name="send to decrypt queue"/>
+		<set-property propertyName="status_step" value="sfg_unzip_step1" doc:name="Status Step"/>
+        <set-property propertyName="status_value" value="1" doc:name="Status Value"/>
+        <set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status"/>
+
+        <set-property propertyName="xfer_status" value="0" doc:name="Transfer Step"/>
+        <set-property propertyName="origName" value="#[message.inboundProperties.originalFilename]" doc:name="Status Value"/>
+        <set-property propertyName="xfer_id" value="#[message.id]" doc:name="Status XFER ID"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.transfer.queue" connector-ref="sfg.common.transfer.queue" doc:name="Add transfer"/>
+        <exception-strategy ref="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step1_flow" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="sfg_decrypt_step_flow">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="sfg.decrypt.step.queue" connector-ref="sfg.decrypt.step.queue" doc:name="Decryption"/>
+        <encryption:decrypt config-ref="PGP_ENCR_DCR" using="PGP_ENCRYPTER" doc:name="Decryption"/>
+        <file:outbound-endpoint path="${sfg_unzip_step1_inbox_staging}" outputPattern="#[message.inboundProperties.stagingName]" connector-ref="File" responseTimeout="10000" doc:name="Output for staging"/>
+        <set-property propertyName="stagingName" value="#[message.inboundProperties.stagingName]" doc:name="stagingName"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.unzip.step2.queue" connector-ref="sfg.unzip.step2.queue" doc:name="Send to unzip queue"/>
+        <exception-strategy ref="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step1_flow" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    <!-- Unzip the file using Java, stage for iShare, update the status  -->
+    <flow name="sfg_unzip_step_flow">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="sfg.unzip.step2.queue" connector-ref="sfg.unzip.step2.queue" doc:name="zip Files"/>
+       <set-variable variableName="stagingPath" value="${sfg_unzip_step1_inbox_staging}" doc:name="stagingPath Variable"/>
+        <set-variable variableName="stagingName" value="#[message.inboundProperties.stagingName]" doc:name="stagingName Variable"/>
+        <scripting:transformer doc:name="Get file inputstream">
+            <scripting:script engine="Groovy"><![CDATA[
+            String stagingPath = message.getInvocationProperty('stagingPath');
+            String folderPath = stagingPath + File.separator;
+            String fileName = message.getInvocationProperty('stagingName');
+            File file = new File(folderPath, fileName);
+            try {
+              payload = file.newInputStream();
+            } catch(Exception e) {
+              throw e;
+            }
+          ]]></scripting:script>
+        </scripting:transformer>
+       <set-variable variableName="cid" value="#[java.util.UUID.randomUUID()]" doc:name="cid"/>
+        <set-variable variableName="unzipOutputFolder" value="${sfg_unzip_step1_inbox_output}" doc:name="unzipOutputFolderPath"/>
+        <set-variable variableName="unzipBackupFolder" value="${sfg_unzip_step1_inbox_backup}" doc:name="unzip Backup FolderPath"/>
+        <custom-transformer class="com.mule.zip.UnzipTransformer" doc:name="Java"/>
+	        
+	        <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.unzip.step3.queues" connector-ref="sfg.unzip.step3.queue" doc:name="Send to step 3 queue"/>
+	
+	        <set-property propertyName="status_step" value="sfg_unzip_step2" doc:name="Status Step"/>
+	        <set-property propertyName="status_value" value="1" doc:name="Status Value"/>
+	        <set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID"/>
+	        <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status"/>
+     
+        
+        
+        
+        
+        <exception-strategy ref="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step2_flow" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <!-- Unzip the file using Java, stage for iShare, update the status  -->
+
+    <!--  Send the raw file to iShare1 using ConnectDirect, update the status -->
+    
+    <flow name="sfg_unzip_step3_flow">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="sfg.unzip.step3.queue" connector-ref="sfg.unzip.step3.queue" doc:name="Send to  "/>
+
+        <set-variable variableName="cdScript" value="${MULE_HOME}/resources/cd_file.sh" doc:name="CDP Variable"/>
+        <set-variable variableName="stagingPath" value="${sfg_unzip_step2_outbox_live}" doc:name="stagingPath Variable"/>
+        <set-variable variableName="stagingName" value="#[message.inboundProperties.stagingName]" doc:name="stagingName Variable"/>
+        <set-variable variableName="destName" value="#[message.inboundProperties.filename]" doc:name="destName Variable"/>
+        <set-variable variableName="sfg_unzip_step3_ndmscript" value="${sfg_unzip_step3_ndmscript}" doc:name="CDP Script"/>
+        <scripting:transformer doc:name="Execute NDM script">
+           <scripting:script engine="Groovy"><![CDATA[
+             def fileName = message.getInvocationProperty('stagingPath') + message.getInvocationProperty('stagingName')
+             def destName = message.getInvocationProperty('destName')
+             def runScript = message.getInvocationProperty('cdScript') + " " + message.getInvocationProperty('sfg_unzip_step3_ndmscript') + " &SFILE=" + fileName + " &DFILE=" + destName
+             def stdout = new StringBuilder()
+             def stderr = new StringBuilder()
+             def cmd = runScript.execute()
+             cmd.waitForProcessOutput(stdout, stderr)
+             flowVars.sfg_unzip_step3_ndmstdout = stdout.toString()
+             flowVars.sfg_unzip_step3_ndmstderr = stderr.toString()
+             flowVars.sfg_unzip_step3_ndmexitcode = cmd.exitValue()
+           ]]></scripting:script></scripting:transformer>
+         <choice doc:name="Choice">
+           <when expression="#[flowVars.sfg_unzip_step3_ndmexitcode == 0]">
+             <set-property propertyName="status_step" value="sfg_unzip_step3" doc:name="Status Step"/>
+             <set-property propertyName="status_value" value="1" doc:name="Status Value"/>
+             <set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID"/>
+             <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update OK status"/>
+
+             <set-property propertyName="xfer_status" value="1" doc:name="Transfer Step"/>
+             <set-property propertyName="finalName" value="#[flowVars.destName]" doc:name="File name"/>
+             <set-property propertyName="dstServer" value="" doc:name="Destination server"/>
+             <set-property propertyName="xfer_id" value="#[message.id]" doc:name="XFER ID"/>
+             <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.transfer.queue" connector-ref="sfg.common.transfer.queue" doc:name="Add transfer"/>
+           </when>
+           <otherwise>
+             <set-property propertyName="status_step" value="sfg_unzip_step3" doc:name="Status Step"/>
+             <set-property propertyName="status_value" value="0" doc:name="Status Value"/>
+             <set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID"/>
+             <vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update FAIL status"/>
+           </otherwise>
+        </choice>
+        <exception-strategy ref="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step3_flow" doc:name="Reference Exception Strategy"/>
+        
+        
+    </flow>
+
+<!--      Send the raw file to iShare2 using ConnectDirect, update the status -->
+
+</mule>
+
+
+
+

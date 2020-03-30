@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:encryption="http://www.mulesoft.org/schema/mule/encryption" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/encryption http://www.mulesoft.org/schema/mule/encryption/current/mule-encryption.xsd">
+    <file:connector name="in" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <encryption:config name="Encryption" defaultEncrypter="PGP_ENCRYPTER" doc:name="Encryption">
+        <encryption:pgp-encrypter-config publicKeyRingFileName="C:\Users\MuleSoft\AnypointStudio\AssignmentWs\Ttest_unzipMarch29\src\main\resources\muleuser-publickey.gpg" secretKeyRingFileName="C:\Users\MuleSoft\AnypointStudio\AssignmentWs\Ttest_unzipMarch29\src\main\resources\muleuser-privatekey.gpg" secretPassphrase="muleuser" principal="muleuser &lt;muleuser@gmail.com&gt;"/>
+    </encryption:config>
+    <file:connector name="enc_input" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <file:connector name="out" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <flow name="mule_encryptionFlow">
+        <file:inbound-endpoint responseTimeout="10000" doc:name="File" connector-ref="in" path="${sfg_encrypt_step1_input}"/>
+        <logger message="Encyption Started" level="INFO" doc:name="Logger"/>
+        <encryption:encrypt config-ref="Encryption" using="PGP_ENCRYPTER" doc:name="Encryption"/>
+        <file:outbound-endpoint path="${sfg_unzip_step1_inbox_live}" connector-ref="enc_input" responseTimeout="10000" doc:name="File" outputPattern="#[message.inboundProperties.originalFilename].pgp"/>
+        <logger message="Encyption Ends" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>
