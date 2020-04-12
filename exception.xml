@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+
+<choice-exception-strategy name="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step1_flow">
+	
+		<catch-exception-strategy doc:name="IO Catch Exception Strategy" when="#[exception.causeMatches('java.io.IOException')]">
+			<exception-type-filter expectedType="java.io.IOException" doc:name="java.io.IOException" />
+			<logger message="Error encrypting message #[exception.cause.message]" level="ERROR" doc:name="io Exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step1" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+        <catch-exception-strategy doc:name="Default Catch Exception Strategy" when="#[exception.causeMatches('java.lang.Exception')]">
+			<exception-type-filter expectedType="java.lang.Exception" doc:name="java.lang.Exception" />
+			<logger message="Error message #[exception.cause.message]" level="ERROR" doc:name="Default Exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step1" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+	</choice-exception-strategy>
+
+	<choice-exception-strategy name="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step2_flow">
+
+
+        <catch-exception-strategy doc:name="IO Catch Exception Strategy" when="#[exception.causeMatches('java.io.IOException')]">
+			<exception-type-filter expectedType="java.io.IOException" doc:name="java.io.IOException" />
+			<logger message="Error IO message #[exception.cause.message]" level="ERROR" doc:name="io Exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step2" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+		<catch-exception-strategy doc:name="Java exception strategy" when="#[exception.causeMatches('org.mule.api.transformer.TransformerMessagingException')]">
+			<exception-type-filter expectedType="org.mule.api.transformer.TransformerMessagingException" doc:name="org.mule.api.transformer.TransformerMessagingException" />
+			<logger message="Error Unzip-Java exception message #[exception.cause.message]" level="ERROR" doc:name="Error Unzip-Java exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step2" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+		
+
+        <catch-exception-strategy doc:name="Default Catch Exception Strategy" when="#[exception.causeMatches('java.lang.Exception')]">
+			<exception-type-filter expectedType="java.lang.Exception" doc:name="java.lang.Exception" />
+			<logger message="Error message #[exception.cause.message]" level="ERROR" doc:name="Default Exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step2" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+	</choice-exception-strategy>
+	
+	<choice-exception-strategy name="unzip_exception_handlerCatch_Exception_Strategy-for-sfg_unzip_step3_flow">
+	
+		<catch-exception-strategy doc:name="IO Catch Exception Strategy" when="#[exception.causeMatches('java.io.IOException')]">
+			<exception-type-filter expectedType="java.io.IOException" doc:name="java.io.IOException" />
+			<logger message="Error encrypting message #[exception.cause.message]" level="ERROR" doc:name="io Exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step3" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+        <catch-exception-strategy doc:name="Default Catch Exception Strategy" when="#[exception.causeMatches('java.lang.Exception')]">
+			<exception-type-filter expectedType="java.lang.Exception" doc:name="java.lang.Exception" />
+			<logger message="Error message #[exception.cause.message]" level="ERROR" doc:name="Default Exception" />
+			<set-property propertyName="status_step" value="sfg_unzip_step3" doc:name="Status Step" />
+			<set-property propertyName="status_value" value="0" doc:name="Status Value" />
+			<set-property propertyName="status_xfer_id" value="#[message.id]" doc:name="Status XFER ID" />
+			<vm:outbound-endpoint exchange-pattern="one-way" path="sfg.common.status.queue" connector-ref="sfg.common.status.queue" doc:name="Update status" />
+		</catch-exception-strategy>
+		
+	</choice-exception-strategy>
+
+
+
+</mule>
